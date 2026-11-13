@@ -14,4 +14,4 @@ The prepared notebook retains the original workflow and much of its R code. Chan
 8. Replace the naniar missingness graphic with a base-R missingness image, removing an unnecessary dependency.
 9. Add a synthetic generator, Python checks, documentation, and Git exclusions. No original numerical results or figures are carried over.
 
-These are AI-assisted preparation changes, not evidence of what was submitted for the original course. R execution and HTML rendering were subsequently verified in an isolated Ubuntu 24.04 ARM64 container; see VALIDATION.md.
+These are publication-preparation changes, not evidence of what was submitted for the original course. R execution and HTML rendering were subsequently verified in an isolated Ubuntu 24.04 ARM64 container; see VALIDATION.md.

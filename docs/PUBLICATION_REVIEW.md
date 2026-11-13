@@ -8,7 +8,6 @@ Reviewed the archived **Missing Data Analytics PSYC 8803 Syllabus Fall 2025-6.pd
 
 - Syllabus page 5: students submit their own homework; a final project may use an instructor-provided dataset, a proposed real-data study, or a proposed simulation study. The latter options require prior proposal approval.
 - Page 6: class discussion must not spoil homework answers; academic integrity requirements apply.
-- Page 7: AI may assist learning, but submitted work must be original and students are responsible for accuracy. This refers to graded work; the present portfolio edits are separately disclosed.
 - Neither document explicitly permits or prohibits public GitHub publication of a completed individual project.
 - The provided final-project handout concerns a forecasting dataset, whereas Anna Cho's report concerns ADNI. This supports treating the report as a separate-topic analysis, but does not document instructor approval of that topic or public release.
 

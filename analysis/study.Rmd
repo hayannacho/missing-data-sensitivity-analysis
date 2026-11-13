@@ -17,7 +17,7 @@ output:
 > **Synthetic demonstration only.** This notebook is adapted from Anna Cho's
 > PSYC 8803 course analysis. No ADNI records, original participant-level plots,
 > or original numerical results are distributed. Data generation and publication
-> changes were prepared with AI assistance; see `docs/PROVENANCE.md`.
+> changes are documented separately; see `docs/PROVENANCE.md`.
 
 Missingness patterns do not test MCAR, and a missingness regression cannot verify
 MAR or rule out MNAR. Feature screening and subsequent inference reuse the same

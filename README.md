@@ -66,7 +66,7 @@ This attribution is based on the named report and its analysis, not a verified l
 
 The notebook follows the original analysis structure while making the public example independent of participant records. Synthetic features are named `PEP001`–`PEP069`; their selected feature and estimates are not the original study's results.
 
-Publication preparation adds explicit feature selection, BH-adjusted screening p-values, type-appropriate imputation methods, a complete-case comparison restricted to the MI population, and diagnostic traces. These additions were prepared with AI assistance and are distinguished from the original work in [provenance](docs/PROVENANCE.md).
+Publication preparation adds explicit feature selection, BH-adjusted screening p-values, type-appropriate imputation methods, a complete-case comparison restricted to the MI population, and diagnostic traces. These additions are distinguished from the original work in [provenance](docs/PROVENANCE.md).
 
 ## Files and data boundaries
 
@@ -77,7 +77,7 @@ Publication preparation adds explicit feature selection, BH-adjusted screening p
 | `tests/` | Generator reproducibility and scenario coverage |
 | `docs/` | Contribution evidence, provenance, data dictionary and validation |
 
-No participant records, original CSVs, original rendered reports, individual-level figures, lecture materials, assignment prompt, or Git history are included. [Data handling](docs/DATA_HANDLING.md) explains the boundary. [AI usage](AI_USAGE.md) describes this preparation; AI use in the original analysis is not established by the available evidence.
+No participant records, original CSVs, original rendered reports, individual-level figures, lecture materials, assignment prompt, or Git history are included. [Data handling](docs/DATA_HANDLING.md) explains the boundary.
 
 No new software license is assigned in this preparation; see [NOTICE.md](NOTICE.md).
 

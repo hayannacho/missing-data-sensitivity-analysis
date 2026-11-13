@@ -16,6 +16,6 @@ See `synthetic-validation-results.txt`, `tested-session-info.txt`, and `tested-p
 
 ## Scope and limits
 
-The optional Bayesian block is disabled and was not run. Original ADNI results were not reproduced. No real participant records were loaded. Package installation via the native CRAN helper was not tested; the container used Ubuntu binary packages. Successful synthetic execution does not establish correct assumptions for clinical data or course permission to publish.
+The optional Bayesian block is disabled and was not run. Original ADNI results were not reproduced. No real participant records were loaded. Package installation via the native CRAN helper was not tested; the container used Ubuntu binary packages. Successful synthetic execution does not establish correct assumptions for clinical data.
 
 The public ZIP excludes generated CSV/HTML, course PDFs, original data, original report outputs and caches. Local generated outputs remain available for review under ignored `data/` and `output/` directories. The manifest records the original Rmd hash.

@@ -36,7 +36,7 @@ Open `output/study.html`. Generated data and rendered output are ignored by Git.
 
 **Validation status:** the Python tests and full R/HTML pipeline passed on synthetic data in Ubuntu 24.04 ARM64 with R 4.3.3 and mice 3.16.0. Both scenarios completed 20 imputations × 10 iterations without mice logged events. Runtime success does not validate real-data assumptions or establish convergence for other datasets. See [validation](docs/VALIDATION.md).
 
-**Course context:** this is a portfolio adaptation, not the original submitted report or an instructor-endorsed release. The reviewed course documents contain no explicit GitHub permission or prohibition; separate instructor permission has not been obtained. See [publication review](docs/PUBLICATION_REVIEW.md).
+Course materials and original study records are not included. See the examples and validation notes for the distributed inputs and checked behavior.
 
 ```sh
 python3 -m unittest discover -s tests -v
@@ -60,7 +60,7 @@ My original analysis examined how missing-data decisions affect an estimated ass
 - Use `mice` for multiple imputation and pool regression estimates using Rubin's rules.
 - Compare estimates when zero WMH measurements are retained versus excluded.
 
-This attribution is based on the named report and its analysis, not a verified line-by-line authorship history. The archive does not establish the division of any upstream data preparation work. See [contributions](docs/CONTRIBUTIONS.md).
+Individual coursework — PSYC 8803, Fall 2025. The project implements missingness analysis, pooled regression and measurement-handling sensitivity checks. This public edition uses synthetic data only.
 
 ## What this repository demonstrates
 

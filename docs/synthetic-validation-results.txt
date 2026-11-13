@@ -1,0 +1,14 @@
+PASS: full synthetic notebook and analysis invariants
+Rows: 400 MI population: 368 WMH-positive population: 330
+Selected synthetic feature: PEP001
+Both scenarios: 20 imputations, 10 iterations, no mice logged events
+                         method  estimate
+1  Complete-case (all eligible) 0.1627188
+2 Complete-case (MI population) 0.1696860
+3                      MI (MAR) 0.1605850
+              scenario  estimate  std.error statistic        df      p.value
+1     WMH: 0 kept as 0 0.1605850 0.01429817  11.23116  60.94566 1.765397e-16
+2 WMH: 0 treated as NA 0.1634116 0.01249209  13.08120 146.25390 2.217978e-26
+      2.5 %    97.5 %
+1 0.1319935 0.1891765
+2 0.1387233 0.1880999

@@ -1,0 +1,451 @@
+---
+title: "Missing-data sensitivity analysis — synthetic demonstration"
+author: "Anna Cho"
+date: "Original study: 2025-12-07"
+params:
+  data_path: "../data/synthetic_demo.csv"
+  imputations: 20
+  iterations: 10
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: false
+    df_print: paged
+---
+
+> **Synthetic demonstration only.** This notebook is adapted from Anna Cho's
+> PSYC 8803 course analysis. No ADNI records, original participant-level plots,
+> or original numerical results are distributed. Data generation and publication
+> changes were prepared with AI assistance; see `docs/PROVENANCE.md`.
+
+Missingness patterns do not test MCAR, and a missingness regression cannot verify
+MAR or rule out MNAR. Feature screening and subsequent inference reuse the same
+sample: estimates, intervals and p-values are exploratory, even after BH adjustment.
+WMH-zero exclusion changes the analysis population and is not an MNAR sensitivity model.
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE, warning = TRUE, message = TRUE)
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(mice)
+library(broom)
+library(knitr)
+library(purrr)
+
+# This public notebook only accepts the generated, explicitly labelled demo.
+if (basename(params$data_path) != "synthetic_demo.csv") {
+  stop("This public notebook is configured for synthetic_demo.csv only.")
+}
+df <- read_csv(params$data_path, show_col_types = FALSE)
+required <- c("DATA_SOURCE", "TAU_SUVR", "WMH_volume_mm3", "AGE",
+              "PTGENDER", "interval_months", "SUVR_GlobalSUVR",
+              sprintf("PEP%03d", 1:69))
+stopifnot(all(required %in% names(df)), nrow(df) > 0,
+          all(!is.na(df$DATA_SOURCE)),
+          all(df$DATA_SOURCE == "SYNTHETIC_NOT_ADNI"))
+df$DATA_SOURCE <- NULL
+cat("SYNTHETIC DEMONSTRATION — not ADNI results. Rows:", nrow(df), "\n")
+```
+
+# 1. Missing Value Restoration
+
+- Convert PTGENDER to a factor.
+- Recode TAU_SUVR == 0 to missing (NA) for analysis.
+- Keep WMH = 0 as observed in the main analysis; handle WMH zeros later in a sensitivity check.
+
+```{r restore_missing}
+df <- df %>%
+  mutate(
+    PTGENDER = factor(PTGENDER)
+  )
+
+df <- df %>%
+  mutate(
+    TAU_SUVR = ifelse(TAU_SUVR == 0, NA_real_, TAU_SUVR)
+  )
+
+cat("TAU missing:", sum(is.na(df$TAU_SUVR)), "\n")
+cat("WMH missing:", sum(is.na(df$WMH_volume_mm3)), "\n")
+cat("AGE missing:", sum(is.na(df$AGE)), "\n")
+cat("interval missing:", sum(is.na(df$interval_months)), "\n")
+cat("Rows:", nrow(df), "\n")
+```
+
+# 2. Missingness Summary
+
+- Compute the proportion of missing values for all variables.
+- Display the top 20 variables with the highest missingness.
+- Visualize missingness for TAU_SUVR, WMH_volume_mm3, AGE, interval_months, SUVR_GlobalSUVR
+
+```{r missing_summary}
+missing_prop <- colMeans(is.na(df))
+missing_prop_sorted <- sort(missing_prop, decreasing = TRUE)
+
+kable(head(missing_prop_sorted, 20),
+      caption = "Top 20 variables by missingness")
+
+missing_matrix <- is.na(df[, c("TAU_SUVR", "WMH_volume_mm3", "AGE",
+                               "interval_months", "SUVR_GlobalSUVR")])
+image(seq_len(ncol(missing_matrix)), seq_len(nrow(missing_matrix)),
+      t(missing_matrix * 1), col = c("grey90", "steelblue"),
+      axes = FALSE, xlab = "", ylab = "Synthetic row", main = "Missingness (blue = missing)")
+axis(1, at = seq_len(ncol(missing_matrix)), labels = colnames(missing_matrix), cex.axis = 0.6)
+axis(2)
+```
+
+# 3. Descriptive Missingness Patterns
+
+- Create a reduced dataset with TAU_SUVR, WMH_volume_mm3, AGE, PTGENDER, SUVR_GlobalSUVR.
+- Use md.pattern to summarize joint missingness patterns.
+
+```{r mcar_test}
+df_mcar <- df %>%
+  select(TAU_SUVR, WMH_volume_mm3, AGE, PTGENDER, SUVR_GlobalSUVR)
+
+md.pattern(df_mcar, rotate.names = TRUE)
+```
+
+# 4. Associations with TAU Missingness
+
+- Create a binary indicator TAU_missing (1 = TAU_SUVR missing, 0 = observed).
+- Fit a logistic regression: TAU_missing ~ AGE + PTGENDER + SUVR_GlobalSUVR + WMH_volume_mm3.
+- Report odds ratios for predictors of TAU missingness.
+
+```{r miss_model}
+df <- df %>% mutate(TAU_missing = ifelse(is.na(TAU_SUVR), 1, 0))
+
+fit_logit <- glm(
+  TAU_missing ~ AGE + PTGENDER + SUVR_GlobalSUVR + WMH_volume_mm3,
+  data = df,
+  family = binomial()
+)
+
+tidy(fit_logit, exponentiate = TRUE, conf.int = TRUE) %>%
+  kable(digits = 3,
+        caption = "Predictors of TAU missingness (OR scale)")
+```
+
+- Compare observed vs missing TAU groups on age, sex, amyloid SUVR, WMH.
+
+```{r complete_vs_incomplete}
+df %>%
+  group_by(TAU_missing) %>%
+  summarise(
+    n = n(),
+    mean_age = mean(AGE, na.rm = TRUE),
+    prop_female = mean(PTGENDER == "Female", na.rm = TRUE),
+    mean_global_suvr = mean(SUVR_GlobalSUVR, na.rm = TRUE),
+    mean_WMH = mean(WMH_volume_mm3, na.rm = TRUE)
+  ) %>%
+  kable(digits = 2,
+        caption = "Complete vs incomplete cases (by TAU availability)")
+```
+
+# 5. Peptide screening
+
+- Identify 69 explicitly named synthetic peptide-like variables (PEP001–PEP069).
+- Define a screening subset (df_cc_screen) with complete data on TAU_SUVR, AGE, PTGENDER, interval_months.
+- For each peptide, fit: TAU_SUVR ~ peptide + AGE + PTGENDER + interval_months.
+- Extract peptide coefficients and p-values, then rank peptides by p-value.
+- Select the smallest-p-value feature for an exploratory demonstration; it is not a prespecified confirmatory test.
+- Plot TAU_SUVR vs selected peptide with a fitted regression line for the complete cases.
+
+```{r Peptide_screening}
+peptide_vars <- sprintf("PEP%03d", 1:69)
+
+length(peptide_vars)  # 69
+
+# Subset of TAU + covariates complete case for screening
+df_cc_screen <- df %>%
+  filter(
+    !is.na(TAU_SUVR),
+    !is.na(AGE),
+    !is.na(PTGENDER),
+    !is.na(interval_months)
+  )
+nrow(df_cc_screen)
+
+screen_results <- map_dfr(peptide_vars, ~{
+    form <- as.formula(
+      paste("TAU_SUVR ~", .x, "+ AGE + PTGENDER + interval_months"))
+    fit <- lm(form, data = df_cc_screen)
+    
+    broom::tidy(fit) %>%
+      dplyr::filter(term == .x) %>%
+      mutate(peptide = .x)
+  }
+)
+
+screen_table <- screen_results %>%
+  mutate(p.adjusted.BH = p.adjust(p.value, method = "BH")) %>%
+  arrange(p.value) %>%
+  select(peptide, estimate, std.error, statistic, p.value, p.adjusted.BH)
+
+screen_table %>%
+  head(10) %>%
+  kable(digits = 8,
+        caption = "Top 10 peptides associated with TAU SUVR (complete cases)")
+
+peptide_var <- screen_table %>%
+  slice(1) %>%
+  pull(peptide)
+
+peptide_var  # Determined from synthetic data; not the original study selection.
+
+df_cc_plot <- df_cc_screen %>%
+  filter(!is.na(.data[[peptide_var]]))
+
+ggplot(df_cc_plot, aes(x = .data[[peptide_var]], y = TAU_SUVR)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    x = paste("CSF peptide (", peptide_var, ")", sep = ""),
+    y = "TAU SUVR",
+    title = "Association between peptide and TAU SUVR (complete cases)"
+  )
+```
+
+# 6. Complete-Case Regression
+
+- Construct a complete-case dataset (df_cc) requiring observed TAU_SUVR, selected peptide, AGE, PTGENDER, interval_months.
+- Fit the linear regression: TAU_SUVR ~ selected_feature + AGE + PTGENDER + interval_months.
+
+```{r complete_case}
+df_cc <- df %>%
+  filter(
+    !is.na(TAU_SUVR),
+    !is.na(.data[[peptide_var]]),
+    !is.na(AGE),
+    !is.na(PTGENDER),
+    !is.na(interval_months)
+  )
+
+form_cc <- as.formula(
+  paste("TAU_SUVR ~", peptide_var, "+ AGE + PTGENDER + interval_months")
+)
+
+fit_cc <- lm(form_cc, data = df_cc)
+
+tidy(fit_cc) %>%
+  kable(digits = 4,
+        caption = paste("Complete-case regression for", peptide_var))
+```
+
+# 7. Multiple Imputation under MAR
+
+- Restrict the imputation sample to participants with non-missing WMH_volume_mm3.
+- Select variables for imputation: TAU_SUVR, AGE, PTGENDER, interval_months, WMH_volume_mm3, SUVR_GlobalSUVR, and selected peptide.
+- Use PMM for incomplete numeric variables and logistic regression for incomplete binary PTGENDER; skip fully observed columns.
+- Set the predictor-matrix diagonal to zero. Any missing auxiliary variable is also imputed.
+- Generate 20 imputations by default. This assumes MAR conditional on the included predictors; it does not establish MAR.
+
+```{r mi_setup}
+df_mi <- df %>%
+  filter(!is.na(WMH_volume_mm3)) %>%
+  select(
+    TAU_SUVR,
+    AGE,
+    PTGENDER,
+    interval_months,
+    WMH_volume_mm3,
+    SUVR_GlobalSUVR,
+    all_of(peptide_var)
+  )
+colnames(df_mi)
+
+# A matched complete-case model separates population restriction from imputation.
+fit_cc_matched <- lm(form_cc, data = df_mi, na.action = na.omit)
+make_spec <- function(data) {
+  ini <- mice(data, maxit = 0, printFlag = FALSE)
+  method <- ini$method
+  for (name in names(data)) {
+    method[name] <- if (!anyNA(data[[name]])) "" else if (is.factor(data[[name]])) "logreg" else "pmm"
+  }
+  pred <- ini$predictorMatrix
+  diag(pred) <- 0
+  list(method = method, predictor = pred)
+}
+spec <- make_spec(df_mi)
+
+imp <- mice(
+  df_mi,
+  m = params$imputations, maxit = params$iterations,
+  method = spec$method,
+  predictorMatrix = spec$predictor,
+  seed = 123, printFlag = FALSE
+)
+imp
+plot(imp)  # Inspect chain traces; this is a diagnostic, not a guarantee.
+imp$loggedEvents
+```
+
+# 8. Pooled Regression after MI
+
+- In each imputed dataset, fit the same regression model as the complete-case analysis.
+- Pool estimates across imputations using Rubin’s rules.
+- Extract pooled estimates, standard errors, confidence intervals, RIV, and FMI.
+- Compare the selected peptide effect between complete-case and MI analyses.
+
+```{r mi_pool}
+nrow(df_mi)
+
+fit_mi <- with(
+  imp,
+  lm(
+    as.formula(
+      paste("TAU_SUVR ~", peptide_var, "+ AGE + PTGENDER + interval_months")
+    )
+  )
+)
+
+pool_mi <- pool(fit_mi)
+
+mi_basic <- summary(pool_mi, conf.int = TRUE, conf.level = 0.95)
+
+mi_extra <- pool_mi$pooled %>%
+  dplyr::select(term, riv, lambda, fmi) %>%
+  dplyr::rename(
+    RIV    = riv,
+    Lambda = lambda,
+    FMI    = fmi
+  )
+
+mi_summary <- mi_basic %>%
+  dplyr::left_join(mi_extra, by = "term")
+
+mi_summary %>%
+  kable(
+    digits = 4,
+    caption = "Pooled MI regression"
+  )
+```
+
+```{r comparison_selected_peptide}
+compare_est <- data.frame(
+method = c("Complete-case (all eligible)", "Complete-case (MI population)", "MI (MAR)"),
+estimate = c(
+fit_cc$coefficients[peptide_var],
+fit_cc_matched$coefficients[peptide_var],
+mi_summary$estimate[mi_summary$term == peptide_var])
+)
+
+ggplot(compare_est, aes(x = method, y = estimate)) +
+geom_point(size = 4) +
+geom_segment(aes(x = method, xend = method,
+y = 0, yend = estimate),
+alpha = 0.4) +
+theme_minimal() +
+labs(
+y = "Estimated effect on TAU SUVR",
+x = "",
+title = "Comparison of selected peptide Effect: Complete Case vs MI")
+```
+
+# 9. WMH = 0 Sensitivity Scenario
+
+- Scenario A: Use the MI results where WMH = 0 is kept as a valid value (mi_A).
+- Scenario B: Recode WMH_volume_mm3 = 0 as NA, restrict to non-missing WMH, and re-run MI (mi_B).
+- Fit the same pooled regression model in Scenario B.
+- Compare the selected peptide estimates and standard errors between Scenario A and B.
+
+```{r wmh_sensitivity}
+## Scenario A: main MI (WMH = 0 kept as 0)
+mi_A <- mi_summary %>%
+  mutate(scenario = "WMH: 0 kept as 0")
+
+## Scenario B: treat WMH = 0 as missing
+df_wmh_na <- df %>%
+  mutate(WMH_volume_mm3 = ifelse(WMH_volume_mm3 == 0, NA, WMH_volume_mm3))
+
+sum(is.na(df_wmh_na$WMH_volume_mm3))
+
+df_mi_B <- df_wmh_na %>%
+  filter(!is.na(WMH_volume_mm3)) %>%
+  select(
+    TAU_SUVR,
+    AGE,
+    PTGENDER,
+    interval_months,
+    WMH_volume_mm3,
+    SUVR_GlobalSUVR,
+    all_of(peptide_var)
+  )
+
+spec_B <- make_spec(df_mi_B)
+
+set.seed(456)
+imp_B <- mice(
+  df_mi_B,
+  m = params$imputations, maxit = params$iterations,
+  method = spec_B$method,
+  predictorMatrix = spec_B$predictor, printFlag = FALSE
+)
+
+fit_mi_B <- with(
+  imp_B,
+  lm(
+    as.formula(
+      paste("TAU_SUVR ~", peptide_var, "+ AGE + PTGENDER + interval_months")
+    )
+  )
+)
+
+pool_mi_B <- pool(fit_mi_B)
+
+mi_B <- summary(pool_mi_B, conf.int = TRUE, conf.level = 0.95) %>%
+  mutate(scenario = "WMH: 0 treated as NA")
+
+sens_wmh <- bind_rows(mi_A, mi_B) %>%
+  filter(term == peptide_var) %>%
+  select(
+    scenario, estimate, std.error, statistic, df, p.value,
+    `2.5 %`, `97.5 %`
+  )
+
+sens_wmh %>%
+  kable(
+    digits  = 4,
+    caption = "Sensitivity of peptide effect to WMH=0 handling (0 vs NA)",
+    row.names = FALSE
+  )
+```
+
+# 10. Optional: Bayesian complete case regression
+
+- Fit a Bayesian version of the complete-case regression model using brms: TAU_SUVR ~ selected_feature + AGE + PTGENDER + interval_months.
+- Use priors: b ~ Normal(0, 5), sigma ~ Student_t(3, 0, 10).
+- Run 4 chains with 4000 iterations each (1000 warmup), check convergence (Rhat, ESS).
+- Summarize posterior means and 95% credible intervals for all coefficients.
+
+```{r bayes_cc, eval=FALSE}
+library(brms)
+library(rstan)
+options(mc.cores = parallel::detectCores())
+rstan::rstan_options(auto_write = TRUE)
+
+brm_cc <- brm(
+  formula = form_cc,
+  data    = df_cc,
+  family  = gaussian(),
+  prior   = c(
+    set_prior("normal(0, 5)", class = "b"),
+    set_prior("student_t(3, 0, 10)", class = "sigma")
+  ),
+  seed    = 2025,
+  chains  = 4,
+  iter    = 4000,
+  warmup  = 1000
+)
+
+summary(brm_cc)
+```
+
+# Interpretation limits
+
+Synthetic outputs illustrate the workflow only. They do not reproduce the ADNI
+study or support clinical conclusions. Inspect imputation warnings, logged events,
+and chain traces before interpreting any estimates. The optional Bayesian block
+is disabled by default and requires a separate brms/Stan installation.

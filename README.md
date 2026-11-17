@@ -1,93 +1,86 @@
-# Missing-data sensitivity analysis — synthetic demo
+# Missing-data sensitivity analysis
 
-**Compare complete-case regression, multiple imputation and alternative handling of zero-valued measurements in R.**
+**See how missing-data and measurement-handling choices change a regression estimate.**
 
-> **SYNTHETIC DATA ONLY — NOT REAL ADNI DATA.** Every demo row is generated from equations. No actual participant records, original clinical results or reproduction of the ADNI study are included.
+An R workflow for missingness exploration, feature screening, complete-case regression, and pooled multiple imputation with `mice`. Individual PSYC 8803 coursework, Fall 2025, presented as a reproducible **synthetic-data demo**.
 
-## Features and verified results
+[View results](#results-at-a-glance) · [Run the analysis](#run-the-analysis) · [Validation](docs/VALIDATION.md)
 
-- Generate 400 artificial observations with 69 peptide-like features.
-- Inspect missingness, screen features and compare complete-case estimates with pooled `mice` estimates.
-- Examine how keeping versus excluding zero-valued WMH changes the analysis population and estimate.
-- Render an HTML report with tables and imputation diagnostics.
+## Results at a glance
 
-The validated synthetic run selected **PEP001**, the feature included in the generator's response equation:
+![Synthetic coefficient estimates with 95 percent intervals and analysis population sizes](docs/assets/sensitivity-results.png)
 
-| Analysis on synthetic data | Estimated PEP001 coefficient |
-| --- | ---: |
-| Complete cases, all eligible rows | 0.1627 |
-| Complete cases restricted to the MI population | 0.1697 |
-| Multiple imputation, WMH zeros retained | 0.1606 |
-| Multiple imputation, WMH zeros excluded | 0.1634 |
+All 400 rows are generated from equations. **No real ADNI data or clinical findings are included.** The workflow screens 69 artificial peptide-like features and selects `PEP001`, which appears in the generator's response equation.
 
-**These are artificial demonstration results, not clinical findings.** Both MI scenarios completed 20 imputations × 10 iterations without `mice` logged events. Two Python tests and the full R/HTML pipeline passed. [Recorded outputs](docs/synthetic-validation-results.txt) · [Validation and environment](docs/VALIDATION.md).
+| Analysis | Rows used | PEP001 estimate | 95% interval |
+|---|---:|---:|---|
+| Complete cases, all eligible | 226 | 0.1627 | [0.1341, 0.1914] |
+| Complete cases within the MI population | 207 | 0.1697 | [0.1399, 0.1995] |
+| Multiple imputation, WMH zeros retained | 368 | 0.1606 | [0.1320, 0.1892] |
+| Multiple imputation, WMH zeros excluded | 330 | 0.1634 | [0.1387, 0.1881] |
 
-## Run the synthetic example
+**What to notice:** excluding zero WMH values changes the analysis population from 368 to 330 rows. Estimates are similar in this generated sample; that is not proof of robustness for other data or missingness mechanisms. Intervals are exploratory because feature selection and estimation use the same sample.
 
-Requirements: Python 3 (standard library only), R, and Pandoc (available with RStudio). From the repository root:
+[Exact estimates and intervals](docs/demo/coefficient-comparison.csv) · [Population counts](docs/demo/analysis-populations.csv) · [Figure generator](scripts/plot_results.R)
 
-```sh
+## Workflow
+
+**Generate → inspect missingness → screen features → fit complete cases → impute and pool → compare measurement-handling scenarios.**
+
+- Distinguish missing measurements from valid zero values.
+- Summarize missingness and model associations with outcome availability.
+- Screen 69 features with BH-adjusted screening p-values.
+- Compare complete-case models with pooled `mice` regression estimates.
+- Export an HTML report, diagnostic traces, a result figure, and machine-readable comparisons.
+
+**Verified:** two Python tests and the full R/HTML pipeline passed. Both MI scenarios completed **20 imputations × 10 iterations**, with no `mice` logged events. The new figure reads estimates and intervals directly from fitted objects. [Execution details](docs/VALIDATION.md).
+
+## Run the analysis
+
+Requirements: Python 3 (standard library), R, and Pandoc. From the repository root:
+
+```bash
 python3 scripts/generate_demo.py
 Rscript scripts/install_dependencies.R
 Rscript scripts/render.R
 ```
 
-Open `output/study.html`. Generated data and rendered output are ignored by Git. The notebook defaults to 20 imputations and 10 iterations; inspect convergence diagnostics rather than assuming these settings are sufficient. Optional Bayesian regression is disabled and requires a separate brms/Stan installation.
+Open `output/study.html`. To regenerate the portfolio figure and run the full analysis checks:
 
-**Validation status:** the Python tests and full R/HTML pipeline passed on synthetic data in Ubuntu 24.04 ARM64 with R 4.3.3 and mice 3.16.0. Both scenarios completed 20 imputations × 10 iterations without mice logged events. Runtime success does not validate real-data assumptions or establish convergence for other datasets. See [validation](docs/VALIDATION.md).
-
-Course materials and original study records are not included. See the examples and validation notes for the distributed inputs and checked behavior.
-
-```sh
+```bash
 python3 -m unittest discover -s tests -v
-Rscript tests/validate_analysis.R
+Rscript scripts/plot_results.R
 ```
+
+The figure and two comparison CSVs are written to `output/portfolio/`. This command also renders the report and runs `tests/validate_analysis.R`. Generated data and local output directories are ignored by Git.
+
+### Docker alternative
+
+```bash
+python3 scripts/generate_demo.py
+docker build -t missing-data-r .
+docker run --rm -v "$PWD:/work" -w /work missing-data-r Rscript scripts/plot_results.R
+```
+
+Verified on Ubuntu 24.04 ARM64 with R 4.3.3 and mice 3.16.0. [Tested package versions](docs/tested-package-versions.tsv) describe the environment; Ubuntu packages may receive updates. Optional Bayesian regression is disabled by default and requires a separate brms/Stan installation.
+
+## My analysis
+
+My original coursework examined how missing-data decisions affect an estimated peptide–tau association, adjusting for age, sex, and measurement interval. It included missing-code restoration, missingness analysis, feature screening, complete-case regression, multiple imputation, and a comparison of zero-WMH handling.
+
+This public edition retains that analytical structure with independently generated observations named `PEP001`–`PEP069`. Later additions include explicit feature selection, adjusted screening p-values, type-appropriate imputation, a matched-population complete-case comparison, diagnostics, and the result figure. [Source and changes](docs/PROVENANCE.md).
 
 ## Interpretation
 
-- Missingness patterns alone do not test MCAR; observed associations do not establish MAR or exclude MNAR.
-- Screening and fitting on the same sample make the selected-feature estimates exploratory. BH adjustment does not solve post-selection inference for the later MI model.
-- Restricting to observed WMH and excluding zero WMH change the population. This is a measurement-handling sensitivity analysis, not a general MNAR analysis.
-- Synthetic results demonstrate software behavior, not clinical findings or reproduction of the original ADNI results.
-
-## My work and the analytical question
-
-My original analysis examined how missing-data decisions affect an estimated association between a CSF peptide and tau PET, adjusting for age, sex, and measurement interval. The source R Markdown report names Anna Cho as its author and contains the following analytical workflow:
-
-- Restore missing-value codes while distinguishing missing tau from zero-valued WMH.
-- Summarize missingness and model associations with tau availability.
-- Screen 69 peptide variables and fit an exploratory complete-case regression.
-- Use `mice` for multiple imputation and pool regression estimates using Rubin's rules.
-- Compare estimates when zero WMH measurements are retained versus excluded.
-
-Individual coursework — PSYC 8803, Fall 2025. The project implements missingness analysis, pooled regression and measurement-handling sensitivity checks. This public edition uses synthetic data only.
-
-## What this repository demonstrates
-
-The notebook follows the original analysis structure while making the public example independent of participant records. Synthetic features are named `PEP001`–`PEP069`; their selected feature and estimates are not the original study's results.
-
-Publication preparation adds explicit feature selection, BH-adjusted screening p-values, type-appropriate imputation methods, a complete-case comparison restricted to the MI population, and diagnostic traces. These additions are distinguished from the original work in [provenance](docs/PROVENANCE.md).
+Missingness patterns do not establish MCAR or MAR or exclude MNAR. BH adjustment during screening does not correct post-selection inference for the later regression. Restricting to observed WMH and excluding zeros changes who enters the model; this is a measurement-handling sensitivity analysis, not a general MNAR analysis. Inspect imputation diagnostics rather than assuming that a completed run proves convergence.
 
 ## Files and data boundaries
 
 | Path | Purpose |
-| --- | --- |
-| `analysis/study.Rmd` | Curated version of the original analysis, configured for synthetic input |
-| `scripts/` | Synthetic generator, R dependency installation and rendering |
-| `tests/` | Generator reproducibility and scenario coverage |
-| `docs/` | Contribution evidence, provenance, data dictionary and validation |
+|---|---|
+| `analysis/study.Rmd` | Synthetic-input analysis notebook |
+| `scripts/` | Data generation, dependency installation, rendering, and result plotting |
+| `tests/` | Generator checks and full-analysis invariants |
+| `docs/demo/` | Aggregate synthetic estimates and population counts |
 
-No participant records, original CSVs, original rendered reports, individual-level figures, lecture materials, assignment prompt, or Git history are included. [Data handling](docs/DATA_HANDLING.md) explains the boundary.
-
-No new software license is assigned in this preparation; see [NOTICE.md](NOTICE.md).
-
-## Isolated R validation
-
-With Docker installed, generate the synthetic CSV first, then run:
-
-```sh
-docker build -t missing-data-r .
-docker run --rm -v "$PWD:/work" -w /work missing-data-r
-```
-
-The Dockerfile uses the same base-image digest and package installation commands as the verified container. Ubuntu repository packages may receive updates; `docs/tested-package-versions.tsv` records the tested versions rather than enforcing a complete dependency lock.
+No participant records, original clinical results, original reports, course prompts, or original Git history are included. [Data handling](docs/DATA_HANDLING.md). No new software license is assigned; see [NOTICE](NOTICE.md).

@@ -1,5 +1,13 @@
 # Validation record
 
+## Portfolio result figure — 2026-11-17
+
+The two Python generator tests and full R/HTML analysis were rerun successfully in the existing Ubuntu ARM64 validation image (R 4.3.3, mice 3.16.0). Both MI scenarios again completed 20 imputations × 10 iterations without logged events. `scripts/plot_results.R` sources the full analysis validation, obtains complete-case intervals from `confint`, and obtains MI intervals from pooled model summaries. No estimates are hardcoded in the plotting script.
+
+Complete-case row counts are 226 (all eligible) and 207 (within the MI population). MI populations have 368 rows with zero WMH retained and 330 with zeros excluded, from 400 generated rows. All four estimates/intervals are exported to [CSV](demo/coefficient-comparison.csv); population counts are [separately exported](demo/analysis-populations.csv). The PNG was visually checked for all four methods, interval bounds, labels, and row counts.
+
+The intervals use each fitted model's existing convention (OLS t intervals and pooled MI intervals); they are exploratory after same-sample feature selection. No original clinical records are involved. Analysis code is unchanged; this is a later output-visualization addition.
+
 Validated 2026-11-13 on an isolated Ubuntu 24.04.5 ARM64 Docker container, R 4.3.3, mice 3.16.0, rmarkdown 2.25, Pandoc 3.1.3. Host system R was not installed or changed.
 
 ## Executed
